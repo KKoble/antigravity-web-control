@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Web Control</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify for XSS Sanitization -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static_en/style.css">
+  <!-- Xterm.js (Embedded Terminal) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <!-- Highlight.js for code syntax highlighting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+</head>
+<body class="bg-[#212121] text-[#ececec] flex h-screen overflow-hidden">
+
+  <!-- ================= GLOBAL DRAG & DROP OVERLAY ================= -->
+  <div id="globalDropOverlay" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none hidden transition-all duration-200">
+    <div class="border-2 border-dashed border-[#10a37f] rounded-3xl p-10 flex flex-col items-center justify-center bg-[#1a1a1a]/95 text-center max-w-md mx-4 shadow-2xl scale-95 transition-transform duration-200" id="globalDropCard">
+      <div class="w-16 h-16 rounded-2xl bg-[#10a37f]/20 flex items-center justify-center text-3xl mb-4 text-[#10a37f] shadow-inner">
+        📂
+      </div>
+      <h3 class="text-base font-bold text-white mb-1.5">Drop files here</h3>
+      <p class="text-xs text-[#a0a0a0] leading-relaxed">Share images, source code, and documents directly with the agent.</p>
+      <div class="mt-4 px-3 py-1 bg-[#252525] border border-[#333333] rounded-lg text-[11px] text-[#10a37f] font-mono">
+        + Auto upload and attach to conversation
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= AUTH MODAL (PASSWORD GATE) ================= -->
+  <div id="authModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#2a2a2a] border border-[#3f3f3f] rounded-2xl w-full max-w-md p-7 shadow-2xl text-center">
+      <div class="w-16 h-16 bg-[#10a37f]/20 border border-[#10a37f]/40 rounded-full flex items-center justify-center mx-auto mb-4">
+        <!-- Antigravity Icon -->
+        <svg class="w-9 h-9 text-[#10a37f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+          <path d="M2 12h20"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-white mb-2">Antigravity Web Control</h2>
+      <p class="text-sm text-[#a3a3a3] mb-6">Enter your access password to protect Cloudflare Tunnel and remote access.</p>
+      
+      <form id="authForm" onsubmit="handleLogin(event)">
+        <div class="relative mb-4">
+          <input type="password" id="authPassword" placeholder="Enter access password" 
+            class="w-full bg-[#1e1e1e] border border-[#444444] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#10a37f] transition-all"
+            required autofocus autocomplete="current-password" />
+        </div>
+        <div id="authError" class="text-rose-400 text-xs mb-4 hidden font-medium"></div>
+        <button type="submit" id="authSubmitBtn"
+          class="w-full bg-[#10a37f] hover:bg-[#0e8e6e] text-white font-medium py-3 rounded-xl transition-all shadow-lg hover:shadow-[#10a37f]/20 flex items-center justify-center gap-2">
+          <span>Enter Dashboard</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+          </svg>
+        </button>
+      </form>
+      <p class="text-[11px] text-[#737373] mt-5">Default password is set in the <code class="bg-[#1e1e1e] px-1.5 py-0.5 rounded text-neutral-400">.env</code> file under ACCESS_PASSWORD.</p>
+    </div>
+  </div>
+
+  <!-- ================= LEFT SIDEBAR ================= -->
+  <aside id="sidebar" class="w-[260px] bg-[#171717] flex-shrink-0 flex flex-col h-full border-r border-[#262626] transition-all duration-200 z-30 fixed md:relative -translate-x-full md:translate-x-0">
+    <!-- Top Action Area -->
+    <div class="p-3 pb-2 flex items-center justify-between">
+      <button onclick="startNewChat()" class="flex-1 flex items-center justify-between px-3 py-2 bg-[#212121] hover:bg-[#282828] border border-[#333333] rounded-xl text-sm font-medium text-white transition-all shadow-sm group">
+        <span class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-[#10a37f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>New Chat</span>
+        </span>
+        <span class="text-[11px] text-[#737373] bg-[#2a2a2a] px-1.5 py-0.5 rounded border border-[#383838]">Ctrl+N</span>
+      </button>
+      
+      <!-- Close Sidebar button (Mobile) -->
+      <button onclick="toggleSidebar()" class="md:hidden ml-2 p-2 text-[#a3a3a3] hover:text-white rounded-lg hover:bg-[#262626]">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search / Filter -->
+    <div class="px-3 py-1">
+      <div class="relative">
+        <input type="text" id="chatSearchInput" oninput="filterConversations(this.value)" placeholder="Search conversations..." 
+          class="w-full bg-[#212121] border border-[#2e2e2e] rounded-lg px-2.5 py-1.5 text-xs text-[#d1d1d1] placeholder-[#666666] focus:outline-none focus:border-[#444444]" />
+      </div>
+    </div>
+
+    <!-- Conversations History List -->
+    <div class="flex-1 overflow-y-auto px-2 py-2 space-y-1" id="conversationsContainer">
+      <div class="text-xs font-semibold text-[#737373] px-3 py-2 uppercase tracking-wider">Recent Chats</div>
+      <div id="conversationsList" class="space-y-0.5 text-sm">
+        <!-- Dynamic list populated by JS -->
+        <div class="text-xs text-[#737373] px-3 py-4 text-center">Loading conversations...</div>
+      </div>
+    </div>
+
+    <!-- Sidebar Footer / User Profile (Clean: No local mode box, no shield) -->
+    <div class="p-3 border-t border-[#262626] bg-[#141414]">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-[#10a37f] flex items-center justify-center text-white font-bold text-xs shadow">
+            AG
+          </div>
+          <div class="flex flex-col">
+            <span class="text-xs font-medium text-white">Antigravity Admin</span>
+            <span class="text-[10px] text-[#737373]" id="sessionCountLabel">Loading sessions...</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <!-- Logout -->
+          <button onclick="handleLogout()" title="Sign Out" class="p-1.5 text-[#888888] hover:text-rose-400 hover:bg-[#262626] rounded-lg transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= SIDEBAR BACKDROP (MOBILE) ================= -->
+  <div id="sidebarBackdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/60 z-20 hidden md:hidden"></div>
+
+  <!-- ================= MAIN CHAT CONTENT CANVAS ================= -->
+  <main id="mainContent" class="flex-1 flex flex-col h-full bg-[#212121] relative overflow-hidden transition-[margin] duration-150 ease-out">
+    
+    <!-- TOP HEADER (MODEL SELECTOR + REASONING EFFORT) -->
+    <header class="h-14 border-b border-[#2d2d2d] flex items-center justify-between px-3 md:px-4 bg-[#212121]/95 backdrop-blur-md z-10 gap-2 min-w-0">
+      
+      <!-- Left: Mobile menu toggle & Model dropdown -->
+      <div class="flex items-center gap-1.5 md:gap-2 flex-shrink-0 min-w-0">
+        <button onclick="toggleSidebar()" class="md:hidden p-1.5 text-[#a3a3a3] hover:text-white rounded-lg hover:bg-[#2c2c2c] flex-shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+
+        <!-- Model Selector Dropdown Button -->
+        <div class="relative flex-shrink-0">
+          <button id="modelDropdownBtn" onclick="toggleModelDropdown()" 
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-[#2c2c2c] transition-all text-xs md:text-sm font-semibold text-white group whitespace-nowrap">
+            <span class="flex items-center gap-1.5">
+              <span id="selectedModelLabel">Gemini 3.8 Flash</span>
+              <span id="selectedModelBadge" class="text-[10px] bg-[#10a37f]/20 text-[#10a37f] px-1.5 py-0.5 rounded font-medium border border-[#10a37f]/30">Latest</span>
+            </span>
+            <svg class="w-3.5 h-3.5 text-[#888888] group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+
+          <!-- Model Menu Popover -->
+          <div id="modelMenu" class="absolute left-0 top-12 w-64 bg-[#262626] border border-[#383838] rounded-xl shadow-2xl py-1.5 hidden z-40">
+            <div class="px-3 py-1 text-[11px] font-semibold text-[#888888] uppercase">Select Model</div>
+            <div id="modelListOptions" class="space-y-0.5"></div>
+          </div>
+        </div>
+
+        <!-- Reasoning Effort Dropdown Button -->
+        <div class="relative flex-shrink-0">
+          <button id="effortDropdownBtn" onclick="toggleEffortDropdown()" 
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-[#2c2c2c] transition-all text-xs font-medium text-[#d1d1d1] border border-[#333333] group whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 text-[#10a37f] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-5.04z"></path>
+              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-5.04z"></path>
+            </svg>
+            <span class="hidden sm:inline">Reasoning: </span><strong id="selectedEffortLabel" class="text-white font-semibold">High</strong>
+            <svg class="w-3 h-3 text-[#888888] group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+
+          <!-- Effort Menu Popover -->
+          <div id="effortMenu" class="absolute left-0 top-12 w-64 bg-[#262626] border border-[#383838] rounded-xl shadow-2xl py-1.5 hidden z-40">
+            <div class="px-3 py-1 text-[11px] font-semibold text-[#888888] uppercase">Reasoning Effort</div>
+            <div id="effortListOptions" class="space-y-0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Action Buttons & Tools Unified Dropdown -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <!-- Tools & Settings Dropdown -->
+        <div class="relative flex-shrink-0">
+          <button id="toolsDropdownBtn" onclick="toggleToolsDropdown()" 
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#2c2c2c] transition-all text-xs font-medium text-[#d1d1d1] border border-[#383838] group whitespace-nowrap shadow-sm active:scale-95"
+            title="Tools & Settings">
+            <span class="text-sm">🛠️</span>
+            <span class="font-semibold text-white">Tools & Settings</span>
+            <span id="toolsActiveBadge" class="w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+            <svg class="w-3.5 h-3.5 text-[#888888] group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+
+          <!-- Dropdown Menu Popover -->
+          <div id="toolsMenu" class="absolute right-0 top-12 w-72 bg-[#222222] border border-[#3a3a3a] rounded-2xl shadow-2xl py-2 hidden z-50 divide-y divide-[#303030]">
+            <!-- Group 1: Workspace Tools -->
+            <div class="px-2 py-1 space-y-1">
+              <div class="px-2.5 py-1 text-[10px] font-semibold text-[#888888] uppercase tracking-wider">Workspace Tools</div>
+              
+              <!-- File Explorer & Editor -->
+              <button onclick="handleMenuAction(toggleFileExplorer)" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-base">📂</span>
+                  <div>
+                    <div class="font-medium text-white">File Explorer & Editor</div>
+                    <div class="text-[10px] text-[#888]">Browse, edit, and save code</div>
+                  </div>
+                </div>
+                <span id="menuFileExplorerStatus" class="text-[10px] px-2 py-0.5 rounded-md bg-[#181818] text-[#888] font-mono">Closed</span>
+              </button>
+
+              <!-- Web Terminal -->
+              <button onclick="handleMenuAction(toggleWebTerminal)" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-base">🖥️</span>
+                  <div>
+                    <div class="font-medium text-white">Web Embedded Terminal</div>
+                    <div class="text-[10px] text-[#888]">PowerShell & agy CLI</div>
+                  </div>
+                </div>
+                <span id="menuWebTerminalStatus" class="text-[10px] px-2 py-0.5 rounded-md bg-[#181818] text-[#888] font-mono">Closed</span>
+              </button>
+
+              <!-- CLI Console -->
+              <button onclick="handleMenuAction(openCliTerminal)" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-base">💻</span>
+                  <div>
+                    <div class="font-medium text-white">Open CLI Host Window</div>
+                    <div class="text-[10px] text-[#888]">Host PowerShell window</div>
+                  </div>
+                </div>
+                <span class="text-[10px] text-[#666] font-mono">Host</span>
+              </button>
+            </div>
+
+            <!-- Group 2: Safety & Execution Controls -->
+            <div class="px-2 py-1 space-y-1">
+              <div class="px-2.5 py-1 text-[10px] font-semibold text-[#888888] uppercase tracking-wider">Safety & Controls</div>
+
+              <!-- File Edit Approval Toggle -->
+              <button onclick="handleMenuAction(toggleFileEditApproval)" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span id="menuFileEditIcon" class="text-base">🛡️</span>
+                  <div>
+                    <div class="font-medium text-white">File Edit Approval</div>
+                    <div class="text-[10px] text-[#888]">Review preview before editing</div>
+                  </div>
+                </div>
+                <span id="menuFileEditBadge" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">Approval</span>
+              </button>
+
+              <!-- Tool Execution Mode Toggle -->
+              <button onclick="handleMenuAction(toggleApprovalMode)" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span id="menuApprovalIcon" class="text-base">⚡</span>
+                  <div>
+                    <div class="font-medium text-white">Tool Execution Mode</div>
+                    <div class="text-[10px] text-[#888]">Execution safety policy</div>
+                  </div>
+                </div>
+                <span id="menuApprovalBadge" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Auto</span>
+              </button>
+            </div>
+
+            <!-- Group 3: Settings & Language -->
+            <div class="px-2 py-1 space-y-1">
+              <button onclick="handleMenuAction(openPasswordModal)" 
+                class="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <span class="text-base">🔑</span>
+                <div>
+                  <div class="font-medium text-white">Change Access Password</div>
+                  <div class="text-[10px] text-[#888]">Bcrypt salted hash encryption</div>
+                </div>
+              </button>
+
+              <a href="/" 
+                class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-[#2d2d2d] text-[#d1d1d1] hover:text-white transition-all text-left">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-base">🌐</span>
+                  <div>
+                    <div class="font-medium text-white">Switch to Korean</div>
+                    <div class="text-[10px] text-[#888]">한국어 버전으로 전환</div>
+                  </div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded-md bg-[#181818] text-[#888] font-mono">KO</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Chat Button -->
+        <button onclick="startNewChat()" title="Start New Chat (Ctrl+N)" 
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-[#10a37f] hover:bg-[#0e8e6e] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex-shrink-0 active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span class="hidden sm:inline">New Chat</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- CHAT MESSAGES SCROLL CONTAINER -->
+    <div id="chatScrollArea" class="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
+      <div class="max-w-3xl mx-auto space-y-6" id="messagesContainer">
+        
+        <!-- EMPTY / WELCOME SCREEN -->
+        <div id="welcomeHero" class="flex flex-col items-center justify-center min-h-[50vh] text-center pt-8">
+          <div class="w-14 h-14 bg-gradient-to-br from-[#10a37f] to-emerald-700 rounded-2xl flex items-center justify-center shadow-lg shadow-[#10a37f]/20 mb-5">
+            <svg class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+              <path d="M2 12h20"></path>
+            </svg>
+          </div>
+          <h1 class="text-2xl font-bold text-white mb-2">How can I help you today?</h1>
+          <p class="text-sm text-[#999999] max-w-md mb-8">Pair program, run commands in terminal, inspect code, and automate workflows with Antigravity.</p>
+          
+          <!-- Suggestion Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-xl text-left">
+            <div onclick="fillPrompt('Analyze and summarize the project directory structure')" class="p-3.5 bg-[#262626] hover:bg-[#2d2d2d] border border-[#333333] hover:border-[#444444] rounded-xl cursor-pointer transition-all">
+              <div class="text-xs font-semibold text-white mb-1">📁 Analyze Project Structure</div>
+              <div class="text-[11px] text-[#999999]">Summarize files and architecture in workspace.</div>
+            </div>
+            <div onclick="fillPrompt('Summarize key features and slash commands of Antigravity CLI')" class="p-3.5 bg-[#262626] hover:bg-[#2d2d2d] border border-[#333333] hover:border-[#444444] rounded-xl cursor-pointer transition-all">
+              <div class="text-xs font-semibold text-white mb-1">⚡ CLI Features & Commands</div>
+              <div class="text-[11px] text-[#999999]">List available slash commands and tool options.</div>
+            </div>
+            <div onclick="fillPrompt('Write a clean FastAPI web scraper script in Python')" class="p-3.5 bg-[#262626] hover:bg-[#2d2d2d] border border-[#333333] hover:border-[#444444] rounded-xl cursor-pointer transition-all">
+              <div class="text-xs font-semibold text-white mb-1">🐍 Generate Web Scraper</div>
+              <div class="text-[11px] text-[#999999]">Create a production-ready script with error handling.</div>
+            </div>
+            <div onclick="fillPrompt('Review git status and propose clear commit messages')" class="p-3.5 bg-[#262626] hover:bg-[#2d2d2d] border border-[#333333] hover:border-[#444444] rounded-xl cursor-pointer transition-all">
+              <div class="text-xs font-semibold text-white mb-1">📝 Review Git Changes</div>
+              <div class="text-[11px] text-[#999999]">Inspect modified files and generate commit messages.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat messages list -->
+        <div id="messagesList" class="space-y-6"></div>
+      </div>
+    </div>
+
+    <!-- BOTTOM FIXED INPUT AREA -->
+    <div class="p-4 pt-2 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent">
+      <div class="max-w-3xl mx-auto">
+        <!-- Floating Input Container -->
+        <div id="dropZoneContainer" class="relative bg-[#2f2f2f] border border-[#3f3f3f] rounded-3xl p-2.5 shadow-2xl focus-within:border-[#555555] transition-all">
+          
+          <!-- Attachment Previews -->
+          <div id="attachmentPreviewContainer" class="flex flex-wrap gap-2 px-2 pb-2 hidden"></div>
+
+          <!-- Textarea and Attachment Button Row -->
+          <div class="flex items-end gap-1.5">
+            <!-- Paperclip Upload Button -->
+            <button type="button" onclick="document.getElementById('fileInput').click()" 
+              class="p-2 text-[#a3a3a3] hover:text-white hover:bg-[#3d3d3d] rounded-full transition-all flex-shrink-0 mb-0.5" 
+              title="Attach files (images, code, documents)">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+              </svg>
+            </button>
+            <input type="file" id="fileInput" multiple class="hidden" onchange="handleFileSelected(this.files)" />
+
+            <!-- Microphone Voice Dictation Button -->
+            <button type="button" id="micBtn" onclick="toggleVoiceDictation()" 
+              class="p-2 text-[#a3a3a3] hover:text-white hover:bg-[#3d3d3d] rounded-full transition-all flex-shrink-0 mb-0.5" 
+              title="Voice dictation input">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+              </svg>
+            </button>
+
+            <!-- Textarea -->
+            <textarea id="promptInput" rows="1" placeholder="Message Antigravity or drag and drop files..."
+              oninput="autoResizeTextarea(this)" onkeydown="handleInputKeydown(event)"
+              class="w-full bg-transparent text-white placeholder-[#888888] text-sm px-1 py-1.5 focus:outline-none resize-none max-h-48 overflow-y-auto"></textarea>
+          </div>
+          
+          <div class="flex items-center justify-between pt-2 px-1">
+            <!-- Left Info Pills -->
+            <div class="flex items-center gap-2 text-xs text-[#888888]">
+              <span id="activeModelPill" class="bg-[#242424] px-2 py-0.5 rounded-full border border-[#383838] text-[11px]">Gemini 3.8 Flash</span>
+              <span id="activeEffortPill" class="bg-[#242424] px-2 py-0.5 rounded-full border border-[#383838] text-[11px]">Effort: High</span>
+            </div>
+
+            <!-- Right Action Buttons -->
+            <div class="flex items-center gap-2">
+              <!-- Stop Generating Button -->
+              <button id="stopBtn" onclick="stopGenerating()" class="hidden bg-[#3f3f3f] hover:bg-[#4a4a4a] text-white p-2 rounded-full transition-all" title="Stop generating">
+                <svg class="w-4 h-4 text-rose-400 fill-current" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                </svg>
+              </button>
+
+              <!-- Send Button -->
+              <button id="sendBtn" onclick="sendPrompt()" 
+                class="bg-white hover:bg-neutral-200 text-black p-2 rounded-full transition-all disabled:opacity-40 disabled:hover:bg-white"
+                title="Send (Enter)">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-2 px-2 text-[11px] text-[#737373]">
+          <div>Antigravity Web Control (agy) · Cloudflare Protected</div>
+          
+          <!-- Quota & Token Usage Pill -->
+          <div id="quotaContainer" class="flex items-center gap-2 bg-[#1c1c1c] border border-[#333333] px-3 py-1.5 rounded-xl text-[11px] cursor-pointer hover:border-[#555555] hover:bg-[#252525] transition-all shadow-sm group" onclick="toggleQuotaModal()" title="View Antigravity model limits and token usage">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span id="quotaModelName" class="text-neutral-300 font-medium">Gemini: 81% (5h) · 97% (Weekly)</span>
+            <span class="text-[#444444]">|</span>
+            <span id="quotaTokenUsage" class="text-emerald-400 font-mono font-medium">0 tokens used</span>
+            <span class="text-[10px] text-[#737373] group-hover:text-white transition-colors">Details ↗</span>
+          </div>
+        </div>
+
+        <!-- Quota Details Modal -->
+        <div id="quotaModal" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden" onclick="toggleQuotaModal()">
+          <div class="bg-[#1e1e1e] border border-[#383838] rounded-2xl w-full max-w-xl p-6 shadow-2xl text-left space-y-5" onclick="event.stopPropagation()">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-[#2e2e2e]">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-bold text-white leading-tight">Antigravity Model Quota & Limits</h3>
+                    <span id="quotaLiveBadge" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-semibold">Live Sync</span>
+                  </div>
+                  <p class="text-[11px] text-[#888888]" id="quotaUserAccount">Account: Verified · Plan: Antigravity Pro</p>
+                </div>
+              </div>
+              <button onclick="toggleQuotaModal()" class="text-[#888888] hover:text-white p-1.5 rounded-lg hover:bg-[#2a2a2a] transition-all">✕</button>
+            </div>
+
+            <!-- Gemini Models Section -->
+            <div>
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-[#d4d4d4] mb-2 px-1">
+                <span>Gemini Models</span>
+                <span class="text-[#737373] cursor-help text-[11px]" title="Gemini 3.8 Flash, 3.7 Flash, 3.1 Pro limits">ⓘ</span>
+              </div>
+              <div class="bg-[#161616] border border-[#2b2b2b] rounded-2xl overflow-hidden divide-y divide-[#262626]">
+                <!-- Weekly Limit Remaining -->
+                <div class="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                  <div class="space-y-1 pr-4">
+                    <div class="text-sm font-medium text-white">Weekly Limit Remaining</div>
+                    <div class="text-xs text-[#888888] leading-relaxed" id="geminiWeeklyText">
+                      You have used some of your weekly limit, it will fully refresh in <span class="text-neutral-300 font-medium" id="geminiWeeklyRefresh">6 days, 23 hours</span>.
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span id="geminiWeeklyVal" class="text-base font-bold text-white font-mono">97%</span>
+                    <div id="geminiWeeklyRing" class="relative w-9 h-9 flex items-center justify-center">
+                      <svg class="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2a2a2a" stroke-width="3.8" />
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#22c55e" stroke-width="3.8" stroke-dasharray="97 100" stroke-linecap="round" class="transition-all duration-700" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Five Hour Limit Remaining -->
+                <div class="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                  <div class="space-y-1 pr-4">
+                    <div class="text-sm font-medium text-white">Five Hour Limit Remaining</div>
+                    <div class="text-xs text-[#888888] leading-relaxed" id="gemini5hText">
+                      You have used some of your 5-hour limit, it will fully refresh in <span class="text-neutral-300 font-medium" id="gemini5hRefresh">4 hours, 16 minutes</span>.
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span id="gemini5hVal" class="text-base font-bold text-white font-mono">81%</span>
+                    <div id="gemini5hRing" class="relative w-9 h-9 flex items-center justify-center">
+                      <svg class="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2a2a2a" stroke-width="3.8" />
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#22c55e" stroke-width="3.8" stroke-dasharray="81 100" stroke-linecap="round" class="transition-all duration-700" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Claude and GPT models Section -->
+            <div>
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-[#d4d4d4] mb-2 px-1">
+                <span>Claude and GPT Models</span>
+                <span class="text-[#737373] cursor-help text-[11px]" title="Claude Sonnet 4.6, Claude Opus 4.6, GPT-OSS 120B limits">ⓘ</span>
+              </div>
+              <div class="bg-[#161616] border border-[#2b2b2b] rounded-2xl overflow-hidden divide-y divide-[#262626]">
+                <div class="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                  <div class="space-y-1 pr-4">
+                    <div class="text-sm font-medium text-white">Weekly Limit Remaining</div>
+                    <div class="text-xs text-[#888888] leading-relaxed">
+                      Weekly limit is fully available (100% capacity remaining).
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span id="claudeWeeklyVal" class="text-base font-bold text-white font-mono">100%</span>
+                    <div id="claudeWeeklyRing" class="relative w-9 h-9 flex items-center justify-center">
+                      <svg class="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2a2a2a" stroke-width="3.8" />
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#22c55e" stroke-width="3.8" stroke-dasharray="100 100" stroke-linecap="round" class="transition-all duration-700" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="p-4 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                  <div class="space-y-1 pr-4">
+                    <div class="text-sm font-medium text-white">Five Hour Limit Remaining</div>
+                    <div class="text-xs text-[#888888] leading-relaxed">
+                      Five-hour limit is fully available (100% capacity remaining).
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span id="claude5hVal" class="text-base font-bold text-white font-mono">100%</span>
+                    <div id="claude5hRing" class="relative w-9 h-9 flex items-center justify-center">
+                      <svg class="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2a2a2a" stroke-width="3.8" />
+                        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#22c55e" stroke-width="3.8" stroke-dasharray="100 100" stroke-linecap="round" class="transition-all duration-700" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Token Usage Breakdown -->
+            <div class="bg-[#161616] border border-[#2b2b2b] rounded-2xl p-3.5 space-y-2">
+              <div class="flex items-center justify-between text-xs text-[#888888] pb-2 border-b border-[#262626]">
+                <span>Session Cumulative Token Usage</span>
+                <span id="detailTotalTokens" class="text-emerald-400 font-bold font-mono text-sm">0 tokens</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div class="bg-[#212121] p-2.5 rounded-xl border border-[#2d2d2d]">
+                  <div class="text-[#737373] text-[10px]">Prompt</div>
+                  <div id="detailInputTokens" class="text-white font-mono font-semibold mt-0.5">0</div>
+                </div>
+                <div class="bg-[#212121] p-2.5 rounded-xl border border-[#2d2d2d]">
+                  <div class="text-[#737373] text-[10px]">Output</div>
+                  <div id="detailOutputTokens" class="text-white font-mono font-semibold mt-0.5">0</div>
+                </div>
+                <div class="bg-[#212121] p-2.5 rounded-xl border border-[#2d2d2d]">
+                  <div class="text-[#737373] text-[10px]">Thinking</div>
+                  <div id="detailThinkingTokens" class="text-white font-mono font-semibold mt-0.5">0</div>
+                </div>
+                <div class="bg-[#212121] p-2.5 rounded-xl border border-[#2d2d2d]">
+                  <div class="text-[#737373] text-[10px]">Cache Read</div>
+                  <div id="detailCacheTokens" class="text-white font-mono font-semibold mt-0.5">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="pt-1 flex justify-end gap-2">
+              <button onclick="fetchQuotaData(true)" class="px-3.5 py-1.5 bg-[#2a2a2a] hover:bg-[#333333] text-[#d4d4d4] hover:text-white rounded-xl text-xs font-medium transition-all flex items-center gap-1.5">
+                <span>🔄</span><span>Refresh (API)</span>
+              </button>
+              <button onclick="toggleQuotaModal()" class="px-4 py-1.5 bg-[#10a37f] hover:bg-[#0e8e6e] text-white rounded-xl text-xs font-medium transition-all shadow">
+                OK
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= SLASH COMMAND AUTOCOMPLETE POPUP ================= -->
+  <div id="slashCommandPopup" class="hidden fixed z-50 bg-[#2a2a2a] border border-[#3f3f3f] rounded-2xl shadow-2xl py-1.5 w-72 overflow-hidden" style="bottom:0;left:0;">
+    <div class="px-3 py-1.5 text-[10px] font-bold text-[#888888] uppercase tracking-wider border-b border-[#333333]">Slash Commands</div>
+    <div id="slashCommandList" class="overflow-y-auto max-h-64 py-1"></div>
+  </div>
+
+  <!-- ================= PASSWORD MODAL ================= -->
+  <div id="passwordModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#1e1e1e] border border-[#3a3a3a] rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-[#2e2e2e]">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🔑</span>
+          <h3 class="text-base font-bold text-white">Change Access Password</h3>
+        </div>
+        <button onclick="closePasswordModal()" class="p-1 text-[#888] hover:text-white rounded-lg hover:bg-[#2c2c2c]">✕</button>
+      </div>
+      
+      <div class="p-3 bg-[#181818] border border-[#2e2e2e] rounded-xl text-xs text-[#aaa] space-y-1">
+        <div class="font-semibold text-white flex items-center gap-1.5">
+          <span>🔒</span><span>Bcrypt Salted Hash Security</span>
+        </div>
+        <p class="text-[11px] text-[#888]">
+          Passphrases are securely hashed using cryptographic salt (12 rounds).
+        </p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-[#aaa] mb-1">Current Password</label>
+          <input type="password" id="modalOldPassword" class="w-full bg-[#141414] border border-[#333] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#10a37f] transition-all" placeholder="Enter current password">
+        </div>
+        <div>
+          <label class="block text-xs text-[#aaa] mb-1">New Password</label>
+          <input type="password" id="modalNewPassword" class="w-full bg-[#141414] border border-[#333] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#10a37f] transition-all" placeholder="Enter new password (min. 4 characters)">
+        </div>
+        <div>
+          <label class="block text-xs text-[#aaa] mb-1">Confirm New Password</label>
+          <input type="password" id="modalNewPasswordConfirm" class="w-full bg-[#141414] border border-[#333] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#10a37f] transition-all" placeholder="Re-enter new password">
+        </div>
+        <div id="modalPasswordMsg" class="hidden text-xs py-1"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="closePasswordModal()" class="px-4 py-2 bg-[#2a2a2a] hover:bg-[#333] text-[#ccc] hover:text-white text-xs font-semibold rounded-xl transition-all">Cancel</button>
+          <button onclick="submitModalPasswordChange()" class="px-4 py-2 bg-[#10a37f] hover:bg-[#0e8e6e] text-white text-xs font-semibold rounded-xl transition-all shadow-md">Apply Password</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FILE EXPLORER PANEL ================= -->
+  <div id="fileExplorerPanel" class="hidden fixed right-0 top-0 bottom-0 w-80 bg-[#1a1a1a] border-l border-[#2d2d2d] z-40 flex flex-col shadow-2xl">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b border-[#2d2d2d] bg-[#171717] flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm">📂</span>
+        <span class="text-sm font-semibold text-white">File Explorer</span>
+      </div>
+      <button onclick="toggleFileExplorer()" class="p-1 text-[#888] hover:text-white rounded-lg hover:bg-[#2c2c2c]">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div id="fileExplorerBreadcrumb" class="px-3 py-1.5 text-[11px] text-[#888] border-b border-[#242424] bg-[#1c1c1c] flex-shrink-0 truncate font-mono">
+      / (root)
+    </div>
+
+    <!-- File Tree -->
+    <div id="fileExplorerTree" class="flex-1 overflow-y-auto py-1"></div>
+
+    <!-- Buttons row -->
+    <div class="flex gap-2 p-2 border-t border-[#2d2d2d] bg-[#171717] flex-shrink-0">
+      <button onclick="fileExplorerGoUp()" class="flex-1 text-xs py-1.5 rounded-lg bg-[#262626] hover:bg-[#333] text-[#ccc] hover:text-white transition-all">↑ Up</button>
+      <button onclick="fileExplorerRefresh()" class="flex-1 text-xs py-1.5 rounded-lg bg-[#262626] hover:bg-[#333] text-[#ccc] hover:text-white transition-all">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- ================= ADVANCED FILE EDITOR & VIEWER MODAL ================= -->
+  <div id="fileViewerModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-6">
+    <div class="bg-[#181818] border border-[#383838] rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden">
+      <!-- Editor Header -->
+      <div class="flex items-center justify-between px-5 py-3 border-b border-[#2b2b2b] bg-[#1f1f1f] flex-shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <span id="fileViewerIcon" class="text-base flex-shrink-0">📄</span>
+          <div class="min-w-0 flex items-center gap-2">
+            <span id="fileViewerName" class="text-sm font-semibold text-white font-mono truncate"></span>
+            <span id="fileViewerDirtyBadge" class="hidden text-amber-400 text-xs font-bold" title="Unsaved changes">● Modified</span>
+          </div>
+          <span id="fileViewerPath" class="hidden sm:inline text-[11px] text-[#777] font-mono truncate max-w-md"></span>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button id="fileViewerSaveBtn" onclick="saveFileFromViewer()" 
+            class="px-3.5 py-1.5 bg-[#10a37f] hover:bg-[#0e8e6e] text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95" 
+            title="Save file (Ctrl+S)">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            <span>Save <kbd class="opacity-75 font-mono text-[10px] hidden md:inline">Ctrl+S</kbd></span>
+          </button>
+          <button id="fileViewerDownloadBtn" onclick="downloadCurrentFileViewer()" 
+            class="px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#383838] text-[#e0e0e0] hover:text-white text-xs font-medium rounded-xl transition-all flex items-center gap-1 border border-[#383838]" 
+            title="Download to PC">
+            <span>📥</span><span class="hidden md:inline">Download</span>
+          </button>
+          <button onclick="closeFileViewer()" class="p-1.5 text-[#888] hover:text-white rounded-xl hover:bg-[#2c2c2c] transition-all ml-1" title="Close (Esc)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Editor Main Container with Gutter & Textarea -->
+      <div class="flex-1 flex overflow-hidden bg-[#141414] relative">
+        <!-- Line Number Gutter -->
+        <div id="fileEditorGutter" class="w-12 bg-[#181818] border-r border-[#262626] text-right font-mono text-xs text-[#555] py-4 pr-3 select-none overflow-hidden leading-6"></div>
+        
+        <!-- Textarea Code Editor -->
+        <textarea id="fileViewerTextarea" 
+          class="flex-1 bg-transparent text-[#d4d4d4] font-mono text-xs md:text-sm p-4 resize-none focus:outline-none leading-6 whitespace-pre overflow-auto" 
+          spellcheck="false" 
+          wrap="off"
+          style="tab-size: 2; -moz-tab-size: 2;"></textarea>
+
+        <!-- Readonly Syntax Highlighting View for binary/large files -->
+        <pre id="fileViewerHighlight" class="hidden flex-1 m-0 h-full overflow-auto p-4"><code id="fileViewerCode" class="text-sm"></code></pre>
+      </div>
+
+      <!-- Editor Footer Status Bar -->
+      <div class="flex items-center justify-between px-4 py-1.5 bg-[#1a1a1a] border-t border-[#282828] text-[11px] font-mono text-[#888] flex-shrink-0 select-none">
+        <div class="flex items-center gap-4">
+          <span id="editorCursorPos">Ln 1, Col 1</span>
+          <span id="editorStats">0 lines | 0 chars</span>
+          <span id="editorSaveStatus" class="text-emerald-400">Saved ✓</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="editorFileType">Plain Text</span>
+          <span>UTF-8</span>
+          <span>Spaces: 2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= EMBEDDED WEB TERMINAL PANEL ================= -->
+  <div id="webTerminalPanel" class="hidden fixed right-0 top-0 bottom-0 bg-[#0d0d0d] border-l border-[#2d2d2d] z-40 flex flex-col shadow-2xl" style="width:480px;">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a] bg-[#111] flex-shrink-0 select-none" id="webTerminalResizeHandle" style="cursor:ew-resize;">
+      <div class="flex items-center gap-2">
+        <span class="text-sm">🖥️</span>
+        <span class="text-sm font-semibold text-white">Web Terminal</span>
+        <span class="text-[10px] text-[#555] font-mono" id="webTerminalStatus">Waiting...</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button onclick="webTerminalClear()" title="Clear terminal" class="px-2 py-0.5 text-[10px] text-[#888] hover:text-white hover:bg-[#2c2c2c] rounded transition-all">Clear</button>
+        <button onclick="webTerminalReconnect()" title="Reconnect session" class="px-2 py-0.5 text-[10px] text-[#888] hover:text-white hover:bg-[#2c2c2c] rounded transition-all">Reconnect</button>
+        <button onclick="toggleWebTerminal()" class="p-1 text-[#888] hover:text-white rounded">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <!-- Tab bar: Shell / AGY CLI -->
+    <div class="flex border-b border-[#1e1e1e] flex-shrink-0 bg-[#111]">
+      <button id="termTabShell" onclick="switchTermTab('shell')"
+        class="flex-1 px-3 py-2 text-[11px] font-semibold text-white border-b-2 border-emerald-500 transition-all">
+        ⚡ PowerShell
+      </button>
+      <button id="termTabAgy" onclick="switchTermTab('agy')"
+        class="flex-1 px-3 py-2 text-[11px] font-semibold text-[#666] hover:text-white border-b-2 border-transparent transition-all">
+        🤖 agy CLI
+      </button>
+    </div>
+    <!-- Xterm container -->
+    <div id="webTerminalXterm" class="flex-1 overflow-hidden"></div>
+
+    <!-- Quick Command Input Bar -->
+    <div class="p-2 border-t border-[#222222] bg-[#121212] flex items-center gap-2 flex-shrink-0">
+      <div class="relative flex-1 flex items-center">
+        <span class="absolute left-3 text-xs text-[#10a37f] font-mono select-none">❯</span>
+        <input type="text" id="terminalCmdInput" 
+          placeholder="Command input (press Enter to run)..." 
+          class="w-full bg-[#1c1c1c] border border-[#333333] focus:border-[#10a37f] rounded-xl pl-7 pr-3 py-2 text-xs text-white font-mono focus:outline-none transition-all placeholder-[#666]"
+          autocomplete="off" spellcheck="false" />
+      </div>
+      <button onclick="sendTerminalCmdInput()" 
+        class="px-3.5 py-2 bg-[#10a37f] hover:bg-[#0e8e6e] text-white rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95 flex-shrink-0 flex items-center gap-1"
+        title="Send to terminal (Enter)">
+        <span>Send</span>
+        <span class="text-[10px] opacity-75 font-mono">↵</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="/static_en/app.js"></script>
+</body>
+</html>
