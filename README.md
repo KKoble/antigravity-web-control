@@ -125,10 +125,4 @@ antigravity-web-control/
 ├── .gitignore               # Ignored files and sensitive credentials
 ├── run.py                   # Server launcher
 └── README.md                # Documentation
-```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
+``
