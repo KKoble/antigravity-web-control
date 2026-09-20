@@ -5,7 +5,7 @@ A modern, responsive, and secure Web Interface and Remote Control Dashboard for 
 ---
 
 ## ✨ Features
-
+ 
 - **💬 Real-Time Streaming Chat (`/ws/chat`)**
   - Instant token streaming with markdown rendering, LaTeX equations, and syntax highlighting.
   - Multi-turn conversation management with autosave, rename, and session history.
