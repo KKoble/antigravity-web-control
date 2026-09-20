@@ -1,8 +1,6 @@
-# 🛸 Antigravity Web UI (English Standalone Edition)
+# 🛸 Antigravity Web Remote
 
 A modern, responsive, and secure Web Interface and Remote Control Dashboard for **Google Antigravity CLI (`agy`)**.
-
-Designed with a ChatGPT / Claude styled dark aesthetic, real-time WebSocket communication, embedded web terminal, built-in code editor & file explorer, and enterprise-grade security controls.
 
 ---
 
@@ -16,20 +14,12 @@ Designed with a ChatGPT / Claude styled dark aesthetic, real-time WebSocket comm
 
 - **🖥️ Embedded Web Terminal (Xterm.js + ConPTY)**
   - Full-featured browser terminal running PowerShell or direct `agy` CLI sessions.
-  - Native UTF-8 encoding support with Windows ConPTY backend.
-  - Terminal command input bar with history navigation (Up/Down arrow keys) and Hangul/IME composition buffer.
 
 - **📁 Project File Explorer & Code Editor**
   - Interactive project directory tree viewer with breadcrumb navigation.
   - In-browser code viewer and editor with syntax highlighting.
   - Direct file editing and saving with instant toast notifications.
   - One-click file download button.
-
-- **🛡️ Enterprise Security & Access Control**
-  - **Salted Bcrypt Password Protection**: Secure password hashing with interactive password change dialog.
-  - **Active Session Management**: View all logged-in IP addresses, devices, creation times, and revoke sessions on demand.
-  - **Safety & Execution Approvals**: Toggle tool auto-execution vs. pre-approval mode with interactive diff review.
-  - **Secure HTTP Headers**: X-Frame-Options (Clickjacking guard), MIME sniffing protection, XSS headers, strict referrer policy.
 
 - **📊 Quota & Token Monitor**
   - Real-time token usage meter and quota synchronization.
@@ -115,7 +105,7 @@ Enter your configured `ACCESS_PASSWORD` to access the dashboard.
 ## 🛠️ Project Structure
 
 ```
-antigravity-web-en/
+antigravity-web-control/
 ├── app/
 │   ├── main.py              # FastAPI server, WebSocket endpoints & security middleware
 │   ├── config.py            # Environment configuration & binary detection
@@ -136,14 +126,6 @@ antigravity-web-en/
 ├── run.py                   # Server launcher
 └── README.md                # Documentation
 ```
-
----
-
-## 🔒 Security Best Practices
-
-1. **Never commit `.env`**: Always keep your passwords and API tokens safe. The `.gitignore` is preconfigured to prevent accidental commits.
-2. **Web Terminal Access**: The embedded web terminal is restricted to localhost (`127.0.0.1`) by default. Do not expose the terminal port to public networks without proper tunneling and token authentication.
-3. **Change Default Password**: Change the initial password immediately upon first login using the **Change Access Password** modal.
 
 ---
 
