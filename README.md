@@ -39,7 +39,7 @@ A modern, responsive, and secure Web Interface and Remote Control Dashboard for 
 Clone this repository and navigate into the project directory:
 
 ```bash
-git clone <YOUR_REPO_URL>
+git clone (https://github.com/KKoble/antigravity-web-control
 cd antigravity-web-en
 ```
 
